@@ -1,0 +1,306 @@
+#include "cl_base.h"
+#include <iostream>
+#include <algorithm>
+using namespace std;
+
+#include "cl_application.h"
+#include "cl_1pr.h"
+#include "cl_2pr.h"
+#include "cl2.h"
+#include "cl3.h"
+#include "cl4.h"
+#include "cl5.h"
+#include "cl6.h"
+//параметризированный конструктор с параметрами: указатель на головной объект в дереве иерархии
+//и наименование объекта (имеет значение по умолчанию);
+
+cl_base::cl_base(cl_base* p_parent, std::string ob_name, int number, bool status) {
+
+	this->set_ob_parent(p_parent);
+	this->set_ob_name(ob_name);
+	this->status = status;
+	this->number = number;
+}
+//метод определения имени объекта;
+void cl_base::set_ob_name(std::string ob_name) {
+	if (ob_name != "") this->ob_name = ob_name;
+	else this->ob_name = "name";
+}
+//метод получения имени объекта;
+std::string cl_base::get_ob_name() {
+
+	return this->ob_name;
+}
+//метод переопределения головного объекта для текущего в дереве иерархии;
+void cl_base::set_ob_parent(cl_base* p_parent) {
+	if (p_parent) {
+		this->p_parent = p_parent;
+		this->p_parent->add_child(this);
+	}
+	else this->p_parent = 0;
+}
+//Метод добавления объекта наследника
+void cl_base::add_child(cl_base* child)
+{
+	this->children.push_back(child);
+}
+
+//метод получения указателя на головной объект текущего объекта.
+cl_base* cl_base::get_ob_parent() {
+	return p_parent;
+}
+
+//метод поиска объекта на дереве иерархии по имени
+//(метод возвращает указатель на найденный объект или nullptr);
+
+cl_base* cl_base::search_obj(string name) {
+	cl_base* ob = new cl_base;
+	if (this->get_ob_name() == name) return(this);
+	if (children.size() == 0) return 0;
+	this->it_child = this->children.begin();
+	while (it_child != children.end())
+	{
+		ob = *it_child;
+		if (ob->get_ob_name() == name) return (ob);
+		ob = (*it_child)->search_obj(name);
+		if (ob) return (ob);
+		this->it_child++;
+	}
+	this->it_child--;
+	return 0;
+}
+
+
+//метод установки готовности объекта реализовать (доработать) следующим образом.
+void cl_base::set_status(int num) {
+	if (num == 0)
+		this->status = false;
+	else this->status = true;
+
+}
+bool cl_base::check_status() {
+	cl_base* obj = this;
+	while (obj != 0) {
+		if (obj->status == false)return false;
+		obj = obj->p_parent;
+	}
+	return true;
+
+}
+void cl_base::print_object(std::string name, int floor) {
+	for (int i = 0; i < floor; i++)
+		cout << "    ";
+	cout << name;
+}
+//метод вывода дерева иерархии объектов;
+void cl_base::print_hierachy(int f) {
+	f++;
+	if (children.size() == 0) return;
+
+	this->it_child = this->children.begin();
+	while (it_child != children.end())
+	{
+		cout << "\n";
+		(*it_child)->print_object((*it_child)->get_ob_name(), f);
+		(*it_child)->print_hierachy(f);
+		this->it_child++;
+	}
+	f--;
+	this->it_child--;
+
+}
+//метод вывода дерева иерархии объектов и отметок их готовности;
+void cl_base::print_hierachy_status(int f) {
+	f++;
+	if (children.size() == 0) return;
+
+	this->it_child = this->children.begin();
+	while (it_child != children.end())
+	{
+		cout << "\n";
+		(*it_child)->print_object((*it_child)->get_ob_name(), f);
+		if ((*it_child)->status) cout << " is ready";
+		else cout << " is not ready";
+		(*it_child)->print_hierachy_status(f);
+		this->it_child++;
+	}
+	f--;
+	this->it_child--;
+
+}
+//метод изменения статуса готовности;
+void cl_base::change_status() {
+	if (this->children.size() == 0) return;
+	this->it_child = this->children.begin();
+	while (it_child != children.end())
+	{
+		(*it_child)->status = false;
+		(*it_child)->change_status();
+		this->it_child++;
+	}
+	this->it_child--;
+}
+//добавленные методы в кл32 для поиска
+cl_base* cl_base::find(string s) {
+	if (s == "/") {
+		cl_base* obj = this;
+		while (obj->p_parent) {
+			obj = obj->p_parent;
+		}
+		return obj;
+	}
+	else if (s == ".") return this;
+	else if (s.substr(0, 2) == "//") {
+		cl_base* obj = this;
+		while (obj->p_parent) {
+			obj = obj->p_parent;
+		}
+		return obj->search_obj(s.substr(2, s.length()));
+	}
+	else if (s[0] == '/') {
+		vector <string> vec;
+		vector <int> ind;
+		int i;
+		for (i = 0; i < s.length(); i++) {
+			if (s[i] == '/') ind.push_back(i);
+		}
+		ind.push_back(s.length());
+		for (i = 0; i < ind.size() - 1; i++) {
+			vec.push_back(s.substr(ind[i] + 1, ind[i + 1] - ind[i] - 1));
+		}
+
+		cl_base* obj = this, * cur_ob = 0;
+		while (obj->p_parent) {
+			obj = obj->p_parent;
+		}
+		for (i = 0; i < vec.size(); i++) {
+			cur_ob = obj->search(vec[i]);
+			if (!cur_ob)return 0;
+			obj = cur_ob;
+		}
+		return obj;
+	}
+	else if (s.size() == 0) return 0;
+	else {
+		string l = '/' + s;
+		vector <string> vec;
+		vector <int> ind;
+		int i;
+		for (i = 0; i < l.length(); i++) {
+			if (l[i] == '/') ind.push_back(i);
+		}
+		ind.push_back(l.length());
+		for (i = 0; i < ind.size() - 1; i++) {
+			vec.push_back(l.substr(ind[i] + 1, ind[i + 1] - ind[i] - 1));
+		}
+
+		cl_base* obj = this, * cur_ob = 0;
+		for (i = 0; i < vec.size(); i++) {
+			cur_ob = obj->search(vec[i]);
+			if (!cur_ob)return 0;
+			obj = cur_ob;
+		}
+		return obj;
+	}
+}
+cl_base* cl_base::search(string name) {
+	if (children.size() == 0)return 0;
+	else {
+		for (int i = 0; i < children.size(); i++) {
+			if (children[i]->get_ob_name() == name) return children[i];
+		}
+		return 0;
+	}
+}
+
+//добавленные методы кл33
+
+	//Установления связи между сигналом текущего объекта и обработчиком целевого объекта;
+	//указатель на метод сигнала текущего объекта, указатель на целевой объект
+	//и указатель на метод обработчика целевого объекта
+
+void cl_base::set_connect(TYPE_SIGNAL p_signal, cl_base* p_object, TYPE_HANDLER p_ob_handler) {
+	o_sh* p_value;
+	for (int i = 0; i < connects.size(); i++) {
+		if (connects[i]->p_signal == p_signal && connects[i]->p_cl_base == p_object && connects[i]->p_handler == p_ob_handler)
+			return;
+	}
+	cl_base* obj;
+	p_value = new o_sh();
+	p_value->p_signal = p_signal;
+	p_value->p_cl_base = p_object;
+	p_value->p_handler = p_ob_handler;
+
+	connects.push_back(p_value);
+}
+//Удаления (разрыва) связи между сигналом текущего объекта и обработчиком целевого объекта;
+//указатель на метод сигнала текущего объекта, указатель на целевой объект и
+//указатель на метод обработчика целевого объекта
+
+void cl_base::delete_connect(TYPE_SIGNAL p_signal, cl_base* p_object, TYPE_HANDLER p_ob_handler)
+{
+	o_sh* p_value;
+	for (int i = 0; i < connects.size(); i++) {
+		if (connects[i]->p_cl_base == p_object )
+		{
+			this->connects.erase(connects.begin() + i);
+			return;
+		}
+	}
+}
+
+//Выдачи сигнала от текущего объекта с передачей строковой переменной. 
+//Включенный объект может выдать или обработать сигнал.
+//указатель на метод сигнала и строковую переменную.
+void cl_base::emit_signal(TYPE_SIGNAL p_signal, std::string& s_command) {
+	//Вызов метода сигнала с передачей строковой переменной по ссылке.
+	if (!this->status) return;
+	(this->*p_signal)(s_command);
+	for (int i = 0; i < connects.size(); i++) {//Цикл по всем связям сигнал-обработчик текущего объекта.
+		if ((connects[i]->p_signal == p_signal)&&(connects[i]->p_cl_base->status)) 	//Если в очередной связи сигнал-обработчик участвует
+	//метод сигнала, переданный по параметру,
+	//connects[i]->p_hendler указатель на метод обработчика целевого сигнала
+		{
+			((connects[i]->p_cl_base)->*(connects[i]->p_handler))(connects[i]->p_cl_base, s_command);
+		}//-
+	}
+	//то вызвать метод обработчика очередного целевого объекта и передать в качестве аргумента 
+	//строковую переменную по значению.
+}
+
+
+//Этот метод возвращает абсолютный путь текущего объекта. +
+std::string cl_base::abs_path() {
+	vector <string> s;
+	string path;
+	cl_base* obj = this;
+	int i = 0;
+	if (!(obj->p_parent))return "/";
+	s.push_back(this->get_ob_name());
+	while (obj->p_parent->p_parent) {
+		obj = obj->p_parent;
+		s.push_back(obj->get_ob_name());
+	}
+	reverse(s.begin(), s.end());
+	for (i = 0; i < s.size(); i++) {
+		path += '/' + s[i];
+	}
+	return path;
+}
+
+void cl_base::signal_f(string& message) {
+	message += "(class: 1)";
+	cout << "\n" << "Signal from " << this->abs_path();
+}
+void cl_base::handler_f(cl_base* obj, string& message) {
+	cout << "\n" << "Signal to " << obj->abs_path() << " Text:  " << message;
+}
+
+int cl_base::get_number()
+{
+	return number;
+}
+
+
+
+
